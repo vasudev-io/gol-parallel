@@ -1,4 +1,4 @@
-package gol
+package main
 
 import (
 	"flag"
@@ -19,8 +19,7 @@ func ReverseString(s string, i int) string {
 	return string(runes)
 } */
 
-
-func calculateNextState(p Params, world [][]byte) [][]byte {
+func calculateNextState(p stubs.Params, world [][]byte) [][]byte {
 
 	//making a separate world to check without disturbing the actual world
 	testerworld := make([][]byte, len(world))
@@ -60,30 +59,25 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 	return testerworld
 }
 
-
-
-
 type GameofLifeOperations struct{}
 
 func (s *GameofLifeOperations) Process(req stubs.Request, res *stubs.Response) (err error) {
 
-
 	// for loop to take the request and run the distributor code thru it and then send this code off to
 	// the response
 
-
 	// take the parameters from the req util thingy
-	turn:=0
+	turn := 0
 
-		for turn < req.Turns{
-			req.World = calculateNextState(Params(req.P), req.World)
+	for turn < req.Turns {
+		req.World = calculateNextState(req.P, req.World)
 
-			turn ++
-		}
+		turn++
+	}
 
-		// send the next turn stuff thru to the response struct
-		req.World = res.World
-		res.Turns = turn
+	// send the next turn stuff thru to the response struct
+	req.World = res.World
+	res.Turns = turn
 
 	return
 }
@@ -97,5 +91,3 @@ func main() {
 	defer listener.Close()
 	rpc.Accept(listener)
 }
-
-

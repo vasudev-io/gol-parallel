@@ -17,6 +17,36 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
+func calculateAliveCells(p Params, world [][]byte) []util.Cell {
+
+	var alivecells []util.Cell
+
+	for row := 0; row < p.ImageWidth; row++ {
+		for col := 0; col < p.ImageHeight; col++ {
+
+			pair := util.Cell{}
+			currentCell := world[row][col]
+
+			if currentCell == 255 {
+				pair.X = col
+				pair.Y = row
+				alivecells = append(alivecells, pair)
+
+			}
+		}
+	}
+
+	return alivecells
+}
+
+func makeCall(client rpc.Client, world [][]byte, params Params) *stubs.Response {
+	params = Params(stubs.Params{Turns: params.Turns, Threads: params.Threads, ImageWidth: params.ImageWidth, ImageHeight: params.ImageHeight})
+	request := stubs.Request{World: world, P: stubs.Params(params)}
+	response := new(stubs.Response)
+	client.Call(stubs.Processsor, request, response)
+	return response
+}
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
@@ -25,7 +55,7 @@ func distributor(p Params, c distributorChannels) {
 	height := strconv.Itoa(p.ImageHeight)
 	width := strconv.Itoa(p.ImageWidth)
 
-	FileName := width+"x"+height
+	FileName := width + "x" + height
 	c.ioCommand <- ioInput
 
 	c.ioFilename <- FileName
@@ -44,14 +74,10 @@ func distributor(p Params, c distributorChannels) {
 		}
 	}
 
-
-
 	// TODO: Execute all turns of the Game of Life.
 
-
-
 	// the following would iterate calculating next state till done with turns
-	turn:=0
+	turn := 0
 
 	server := flag.String("server", "54.226.128.78:8030", "IP:port string to connect to as server")
 	flag.Parse()
@@ -59,24 +85,18 @@ func distributor(p Params, c distributorChannels) {
 	defer client.Close()
 
 	resval := makeCall(*client, world, p)
-	 world = resval.World
-	 turn = resval.Turns
-
-
+	world = resval.World
+	turn = resval.Turns
 
 	// report how many turns are over and how many alivers are remaining after each turn
 	// and send that to a channel which goes into the FinalTurnComplete
 
-
 	alivers := calculateAliveCells(p, world)
-
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 
 	final := FinalTurnComplete{CompletedTurns: p.Turns, Alive: alivers}
 	c.events <- final
-
-
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
@@ -87,7 +107,6 @@ func distributor(p Params, c distributorChannels) {
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 }
-
 
 /*
 func calculateNextState(p Params, world [][]byte) [][]byte {
@@ -135,36 +154,3 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 //inner for loop calculates the state of the neighbours
 
 //func CalcNeighbourState(p Params, world [][]byte)
-
-func calculateAliveCells(p Params, world [][]byte) []util.Cell {
-
-	var alivecells []util.Cell
-
-	for row := 0; row < p.ImageWidth; row++ {
-		for col := 0; col < p.ImageHeight; col++ {
-
-			pair := util.Cell{}
-			currentCell := world[row][col]
-
-			if (currentCell == 255) {
-				pair.X = col
-				pair.Y = row
-				alivecells = append(alivecells, pair)
-
-			}
-		}
-	}
-
-	return alivecells
-}
-
-func makeCall(client rpc.Client, world [][]byte, params Params) *stubs.Response {
-	params = Params(stubs.Params{Turns: params.Turns, Threads: params.Threads, ImageWidth: params.ImageWidth, ImageHeight: params.ImageHeight})
-	request := stubs.Request{World:world, P: stubs.Params(params)}
-	response := new(stubs.Response)
-	client.Call(stubs.Processsor, request, response)
-	return response
-}
-
-
-
