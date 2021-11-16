@@ -4,6 +4,7 @@ import (
 	"flag"
 	"net/rpc"
 	"strconv"
+	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -157,11 +158,13 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return alivecells
 }
 
-func makeCall(client rpc.Client, world [][]byte, params Params) *util.Response {
-	request := util.Request{World:world, Params:params}
-	response := new(util.Response)
-	client.Call(util.Processsor, request, response)
+func makeCall(client rpc.Client, world [][]byte, params Params) *stubs.Response {
+	params = Params(stubs.Params{Turns: params.Turns, Threads: params.Threads, ImageWidth: params.ImageWidth, ImageHeight: params.ImageHeight})
+	request := stubs.Request{World:world, P: stubs.Params(params)}
+	response := new(stubs.Response)
+	client.Call(stubs.Processsor, request, response)
 	return response
 }
+
 
 

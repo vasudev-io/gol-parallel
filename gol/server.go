@@ -6,7 +6,7 @@ import (
 	"net"
 	"net/rpc"
 	"time"
-	"uk.ac.bris.cs/gameoflife/util"
+	"uk.ac.bris.cs/gameoflife/stubs"
 )
 
 /* Super-Secret `reversing a string' method we can't allow clients to see.
@@ -65,7 +65,7 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 
 type GameofLifeOperations struct{}
 
-func (s *GameofLifeOperations) Process(req util.Request, res *util.Response) (err error) {
+func (s *GameofLifeOperations) Process(req stubs.Request, res *stubs.Response) (err error) {
 
 
 	// for loop to take the request and run the distributor code thru it and then send this code off to
@@ -76,7 +76,7 @@ func (s *GameofLifeOperations) Process(req util.Request, res *util.Response) (er
 	turn:=0
 
 		for turn < req.Turns{
-			req.World = calculateNextState(req.Params, req.World)
+			req.World = calculateNextState(Params(req.P), req.World)
 
 			turn ++
 		}
