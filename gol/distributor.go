@@ -1,6 +1,8 @@
 package gol
 
 import (
+	"flag"
+	"net/rpc"
 	"strconv"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -14,12 +16,8 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
-
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
-
-
-
 
 	//string conversion for the filename
 
@@ -49,17 +47,19 @@ func distributor(p Params, c distributorChannels) {
 
 	// TODO: Execute all turns of the Game of Life.
 
-	//lol := make (chan []util.Cell)
+
 
 	// the following would iterate calculating next state till done with turns
 	turn:=0
 
-	for turn <p.Turns{
-		world = calculateNextState(p, world)
-		turn ++
-	}
-	alivers := calculateAliveCells(p, world)
-	//lol <- alivers
+	server := flag.String("server", "54.226.128.78:8030", "IP:port string to connect to as server")
+	flag.Parse()
+	client, _ := rpc.Dial("tcp", *server)
+	defer client.Close()
+
+	resval := makeCall(*client, world, p)
+	 world = resval.World
+	 turn = resval.Turns
 
 
 
@@ -67,6 +67,7 @@ func distributor(p Params, c distributorChannels) {
 	// and send that to a channel which goes into the FinalTurnComplete
 
 
+	alivers := calculateAliveCells(p, world)
 
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
@@ -81,11 +82,13 @@ func distributor(p Params, c distributorChannels) {
 	<-c.ioIdle
 
 	c.events <- StateChange{turn, Quitting}
-	
+
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 }
 
+
+/*
 func calculateNextState(p Params, world [][]byte) [][]byte {
 
 	//making a separate world to check without disturbing the actual world
@@ -123,11 +126,11 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 			}
 		}
 	}
-	
+
 	return testerworld
 }
 
-
+*/
 //inner for loop calculates the state of the neighbours
 
 //func CalcNeighbourState(p Params, world [][]byte)
@@ -142,7 +145,7 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 			pair := util.Cell{}
 			currentCell := world[row][col]
 
-			if (currentCell == 255){
+			if (currentCell == 255) {
 				pair.X = col
 				pair.Y = row
 				alivecells = append(alivecells, pair)
@@ -151,7 +154,14 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 		}
 	}
 
-
-
 	return alivecells
 }
+
+func makeCall(client rpc.Client, world [][]byte, params Params) *util.Response {
+	request := util.Request{World:world, Params:params}
+	response := new(util.Response)
+	client.Call(util.Processsor, request, response)
+	return response
+}
+
+
