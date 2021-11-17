@@ -88,6 +88,8 @@ func distributor(p Params, c distributorChannels) {
 	world = resval.World
 	turn = resval.Turns
 
+
+
 	// report how many turns are over and how many alivers are remaining after each turn
 	// and send that to a channel which goes into the FinalTurnComplete
 
@@ -107,50 +109,3 @@ func distributor(p Params, c distributorChannels) {
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
 }
-
-/*
-func calculateNextState(p Params, world [][]byte) [][]byte {
-
-	//making a separate world to check without disturbing the actual world
-	testerworld := make([][]byte, len(world))
-	for i := range world{
-		testerworld[i] = make([]byte, len(world[i]))
-		copy(testerworld[i], world[i])
-	}
-
-	for row := 0; row < p.ImageHeight; row++ {
-		for col := 0; col < p.ImageWidth; col++ {
-
-			alivemeter := 0
-			for i := row - 1; i <= row+1; i++ {
-				for j := col - 1; j <= col+1; j++{
-
-					if (i==row && j==col) {
-						continue
-					}
-
-					if world[((i+p.ImageWidth)%p.ImageWidth)] [(j+p.ImageHeight)%p.ImageHeight] == 255 {
-						alivemeter++
-
-
-					}
-				}
-			}
-
-			// game of life conditions
-			if (alivemeter<2 || alivemeter>3){
-				testerworld[row][col] = 0
-			}
-			if alivemeter==3 {
-				testerworld[row][col]= 255
-			}
-		}
-	}
-
-	return testerworld
-}
-
-*/
-//inner for loop calculates the state of the neighbours
-
-//func CalcNeighbourState(p Params, world [][]byte)

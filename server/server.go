@@ -9,6 +9,39 @@ import (
 	"uk.ac.bris.cs/gameoflife/stubs"
 )
 
+type GameofLifeOperations struct{}
+
+func (s *GameofLifeOperations) Process(req stubs.Request, res *stubs.Response) (err error) {
+
+	// for loop to take the request and run the distributor code thru it and then send this code off to
+	// the response
+
+	// take the parameters from the req util thingy
+	turn := 0
+
+	for turn < req.Turns {
+		req.World = calculateNextState(req.P, req.World)
+
+		turn++
+	}
+
+	// send the next turn stuff thru to the response struct
+	req.World = res.World
+	res.Turns = turn
+
+	return
+}
+
+func main() {
+	pAddr := flag.String("port", "8030", "Port to listen on")
+	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
+	rpc.Register(&GameofLifeOperations{})
+	listener, _ := net.Listen("tcp", ":"+*pAddr)
+	defer listener.Close()
+	rpc.Accept(listener)
+}
+
 /* Super-Secret `reversing a string' method we can't allow clients to see.
 func ReverseString(s string, i int) string {
 	time.Sleep(time.Duration(rand.Intn(i))* time.Second)
@@ -57,37 +90,4 @@ func calculateNextState(p stubs.Params, world [][]byte) [][]byte {
 	}
 
 	return testerworld
-}
-
-type GameofLifeOperations struct{}
-
-func (s *GameofLifeOperations) Process(req stubs.Request, res *stubs.Response) (err error) {
-
-	// for loop to take the request and run the distributor code thru it and then send this code off to
-	// the response
-
-	// take the parameters from the req util thingy
-	turn := 0
-
-	for turn < req.Turns {
-		req.World = calculateNextState(req.P, req.World)
-
-		turn++
-	}
-
-	// send the next turn stuff thru to the response struct
-	req.World = res.World
-	res.Turns = turn
-
-	return
-}
-
-func main() {
-	pAddr := flag.String("port", "8030", "Port to listen on")
-	flag.Parse()
-	rand.Seed(time.Now().UnixNano())
-	rpc.Register(&GameofLifeOperations{})
-	listener, _ := net.Listen("tcp", ":"+*pAddr)
-	defer listener.Close()
-	rpc.Accept(listener)
 }
