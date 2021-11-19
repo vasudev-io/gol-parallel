@@ -79,16 +79,18 @@ func distributor(p Params, c distributorChannels) {
 	// the following would iterate calculating next state till done with turns
 	turn := 0
 
-	server := flag.String("server", "54.226.128.78:8030", "IP:port string to connect to as server")
+	//server := flag.String("server", "127.0.0.1:8030", "IP:port string to connect to as server")
+	server := "127.0.0.1:8030"
 	flag.Parse()
-	client, _ := rpc.Dial("tcp", *server)
+	client, b := rpc.Dial("tcp", server)
+	if b != nil {
+		print("there is no connrction")
+	}
 	defer client.Close()
 
 	resval := makeCall(*client, world, p)
 	world = resval.World
 	turn = resval.Turns
-
-
 
 	// report how many turns are over and how many alivers are remaining after each turn
 	// and send that to a channel which goes into the FinalTurnComplete

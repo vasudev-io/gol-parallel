@@ -1,6 +1,6 @@
 package stubs
 
-var Processsor = "GameofLifeOperations.Processor"
+var Processsor = "GameofLifeOperations.Process"
 
 type Params struct {
 	Turns       int
@@ -17,10 +17,9 @@ type Response struct {
 }
 
 type Request struct {
-	World  [][]byte
-	P      Params
-	Turns  int
+	World [][]byte
+	P     Params
+	Turns int
 
 	//gol.State
 }
-

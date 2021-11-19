@@ -26,7 +26,7 @@ func (s *GameofLifeOperations) Process(req stubs.Request, res *stubs.Response) (
 	}
 
 	// send the next turn stuff thru to the response struct
-	req.World = res.World
+	res.World = req.World
 	res.Turns = turn
 
 	return
