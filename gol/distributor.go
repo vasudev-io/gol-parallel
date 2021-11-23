@@ -47,7 +47,8 @@ func distributor(p Params, c distributorChannels) {
 	turn := 0
 
 	for turn < p.Turns {
-		world = calculateNextState(p, world)
+
+		world = appender(world, 0, p.ImageHeight, p)
 		//print_world(req.World, req.P.ImageHeight, req.P.ImageWidth)
 		//fmt.Println()
 		turn++
@@ -77,7 +78,7 @@ func distributor(p Params, c distributorChannels) {
 
 // TODO: Report the final state using FinalTurnCompleteEvent.
 
-func calculateNextState(p Params, world [][]byte) [][]byte {
+func calculateNextState(p Params, starty, endy int, world [][]byte) [][]byte {
 
 	//making a separate world to check without disturbing the actual world
 	testerworld := make([][]byte, len(world))
@@ -86,7 +87,7 @@ func calculateNextState(p Params, world [][]byte) [][]byte {
 		copy(testerworld[i], world[i])
 	}
 
-	for row := 0; row < p.ImageHeight; row++ {
+	for row := starty; row < endy; row++ {
 		for col := 0; col < p.ImageWidth; col++ {
 
 			alivemeter := 0
@@ -139,16 +140,50 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return alivecells
 }
 
-func makeMatrix(height, width int) [][]uint8 {
-	matrix := make([][]uint8, height)
-	for i := range matrix {
-		matrix[i] = make([]uint8, width)
-	}
-	return matrix
+func worker(world [][]byte, startY, endY, startX, endX int, p Params, out chan<- [][]byte) {
+	//imagePart := worldslice(startY, endY, startX, endX, p)
+
+	imagePart := world
+
+	out <- imagePart
 }
 
-func makeImmutableMatrix(matrix [][]uint8) func(y, x int) uint8 {
-	return func(y, x int) uint8 {
-		return matrix[y][x]
+/*func worldslice(world [][] byte, startY, endY, startX, endX int, p Params) [][]byte {
+	height := endY - startY
+	width := endX - startX
+
+	neWorldSlice:= world
+
+
+	return
+}
+*/
+
+func appender(world [][]byte, startY, endY int, p Params) [][]byte {
+
+	var newWorldData [][]byte
+
+	if p.Threads == 1 {
+		newWorldData = calculateNextState(p, startY, endY, world)
+	} else {
+		workerHeight := p.ImageHeight / p.Threads
+		out := make([]chan [][]byte, p.Threads)
+		for i := range out {
+			out[i] = make(chan [][]byte)
+		}
+
+		for i := 0; i < p.Threads; i++ {
+			go worker(world, i*workerHeight, (i+1)*workerHeight, 0, p.ImageWidth, p, out[i])
+		}
+
+		newWorldData = world
+
+		for i := 0; i < p.Threads; i++ {
+			part := <-out[i]
+			newWorldData = append(newWorldData, part...)
+		}
 	}
+
+	return world
+
 }
