@@ -39,6 +39,7 @@ func TestGol(t *testing.T) {
 							cells = e.Alive
 						}
 					}
+
 					assertEqualBoard(t, cells, expectedAlive, p)
 				})
 			}
