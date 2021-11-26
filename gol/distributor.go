@@ -92,7 +92,7 @@ func distributor(p Params, c distributorChannels) {
 				workerS <- start
 				workerE <- end
 
-				h := end - start
+				//h := end - start
 
 				count := 0
 				for i := start; i < end; i++ {
@@ -155,7 +155,8 @@ workerE := make(chan int)
 
 for i:=0;i<p.Threads; i++{
 	start := i*workerHeight - 1
-	end := (i+1)*workerHeight + 1
+	end := (i+1)*workerH
+eight + 1
 
 	workerS <- start
 	workerE <- end
