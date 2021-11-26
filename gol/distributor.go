@@ -41,35 +41,162 @@ func distributor(p Params, c distributorChannels) {
 		}
 	}
 
-	// TODO: Execute all turns of the Game of Life.
+	// the worker pools to distribute the work to the different worker threads
 
-	// the following would iterate calculating next state till done with turns
+	/*
+		numthreads:=p.Threads
+
+		jobs := make(chan int, numthreads)
+
+		results := make(chan [][]byte, numthreads)
+
+		for j := 1; j <= numthreads; j++{
+			jobs <- j
+		}
+		close(jobs)
+
+		for a := 1; a <= numthreads; a++{
+			<-results
+		}
+	*/
+
 	turn := 0
 
-	for turn < p.Turns {
+	var workerHeight int
 
-		world = appender(world, 0, p.ImageHeight, p)
-		//print_world(req.World, req.P.ImageHeight, req.P.ImageWidth)
-		//fmt.Println()
-		turn++
+	workerHeight = p.ImageHeight / p.Threads
+
+	out := make(chan [][]byte)
+	workerS := make(chan int)
+	workerE := make(chan int)
+
+	newWorldData := world
+
+	if p.Threads == 1 {
+
+		for turn < p.Turns {
+			newWorldData = calculateNextState(p, 0, p.ImageHeight, newWorldData)
+			turn++
+		}
+
+	} else {
+
+		for i := 0; i <= p.Threads; i++ {
+
+			//newWorldData =  worldslice(p, world)
+
+			for i := 0; i < p.Threads; i++ {
+				start := i*workerHeight - 1
+				end := (i+1)*workerHeight + 1
+
+				workerS <- start
+				workerE <- end
+
+				h := end - start
+
+				count := 0
+				for i := start; i < end; i++ {
+					for j := 0; j < p.ImageHeight; j++ {
+						newWorldData[count][j] = world[i][j]
+					}
+					count++
+				}
+
+				go worker(p, newWorldData, workerS, workerE, out)
+
+			}
+
+			newWorldData = make([][]byte, p.ImageHeight)
+			for j := range newWorldData {
+				newWorldData[j] = make([]byte, p.ImageWidth)
+			}
+
+			for turn < p.Turns {
+				part := <-out
+				newWorldData = append(newWorldData, part...)
+
+				turn++
+			}
+
+		}
+
+		// TODO: Execute all turns of the Game of Life.
+
+		// the following would iterate calculating next state till done with turns
+
+		// send the next turn stuff thru to the response struct
+		p.Turns = turn
+
+		alivers := calculateAliveCells(p, newWorldData)
+
+		final := FinalTurnComplete{CompletedTurns: p.Turns, Alive: alivers}
+		c.events <- final
+
+		// Make sure that the Io has finished any output before exiting.
+		c.ioCommand <- ioCheckIdle
+		<-c.ioIdle
+
+		c.events <- StateChange{turn, Quitting}
+
+		// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+		close(c.events)
+
+	}
+}
+
+//func worldslice(p Params, world[][]byte) [][]byte {
+
+/*var workerHeight int
+
+workerHeight = p.ImageHeight / p.Threads
+
+workerS := make(chan int)
+workerE := make(chan int)
+
+for i:=0;i<p.Threads; i++{
+	start := i*workerHeight - 1
+	end := (i+1)*workerHeight + 1
+
+	workerS <- start
+	workerE <- end
+
+	h := end - start
+
+	worldslice1 := make([][]byte, h)
+	for j := range worldslice1 {
+		worldslice1[j] = make([]byte, p.ImageHeight)
+
+	}*/
+
+/*count := 0
+	for i := start; i < end; i++ {
+		for j := 0; j < p.ImageHeight; j++ {
+			worldslice1[count][j] = world[i][j]
+		}
+		count++
 	}
 
-	// send the next turn stuff thru to the response struct
-	p.Turns = turn
+	return worldslice1
+}*/
 
-	alivers := calculateAliveCells(p, world)
+/*for j := 0; j <= height; j++ {
+	for i:= 0; i <= p.ImageWidth; i++ {
 
-	final := FinalTurnComplete{CompletedTurns: p.Turns, Alive: alivers}
-	c.events <- final
+		worldslice1 = world[:len(worldslice1)]
 
-	// Make sure that the Io has finished any output before exiting.
-	c.ioCommand <- ioCheckIdle
-	<-c.ioIdle
+	}
+}
+*/
 
-	c.events <- StateChange{turn, Quitting}
+//}
 
-	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
-	close(c.events)
+func worker(p Params, world [][]byte, workerS <-chan int, workerE <-chan int, out chan<- [][]byte) {
+
+	start := <-workerS
+	end := <-workerE
+
+	workerWorldData := calculateNextState(p, start, end, world)
+	out <- workerWorldData
 
 }
 
@@ -78,16 +205,25 @@ func distributor(p Params, c distributorChannels) {
 
 // TODO: Report the final state using FinalTurnCompleteEvent.
 
-func calculateNextState(p Params, starty, endy int, world [][]byte) [][]byte {
+func calculateNextState(p Params, startY, endY int, world [][]byte) [][]byte {
 
 	//making a separate world to check without disturbing the actual world
-	testerworld := make([][]byte, len(world))
+	testerworld := make([][]byte, endY-startY)
 	for i := range world {
-		testerworld[i] = make([]byte, len(world[i]))
-		copy(testerworld[i], world[i])
+		testerworld[i] = make([]byte, p.ImageWidth)
+		//copy(testerworld[i], world[i])
 	}
 
-	for row := starty; row < endy; row++ {
+	count := 0
+	for i := startY; i < endY; i++ {
+		for j := 0; j < p.ImageHeight; j++ {
+			testerworld[count][j] = world[i][j]
+		}
+		count++
+	}
+
+	plus := 0
+	for row := startY; row < endY; row++ {
 		for col := 0; col < p.ImageWidth; col++ {
 
 			alivemeter := 0
@@ -112,7 +248,10 @@ func calculateNextState(p Params, starty, endy int, world [][]byte) [][]byte {
 			if alivemeter == 3 {
 				testerworld[row][col] = 255
 			}
+
 		}
+
+		plus++
 	}
 
 	return testerworld
@@ -132,58 +271,9 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 				pair.X = col
 				pair.Y = row
 				alivecells = append(alivecells, pair)
-
 			}
 		}
 	}
-
 	return alivecells
-}
-
-func worker(world [][]byte, startY, endY, startX, endX int, p Params, out chan<- [][]byte) {
-	//imagePart := worldslice(startY, endY, startX, endX, p)
-
-	imagePart := world
-
-	out <- imagePart
-}
-
-/*func worldslice(world [][] byte, startY, endY, startX, endX int, p Params) [][]byte {
-	height := endY - startY
-	width := endX - startX
-
-	neWorldSlice:= world
-
-
-	return
-}
-*/
-
-func appender(world [][]byte, startY, endY int, p Params) [][]byte {
-
-	var newWorldData [][]byte
-
-	if p.Threads == 1 {
-		newWorldData = calculateNextState(p, startY, endY, world)
-	} else {
-		workerHeight := p.ImageHeight / p.Threads
-		out := make([]chan [][]byte, p.Threads)
-		for i := range out {
-			out[i] = make(chan [][]byte)
-		}
-
-		for i := 0; i < p.Threads; i++ {
-			go worker(world, i*workerHeight, (i+1)*workerHeight, 0, p.ImageWidth, p, out[i])
-		}
-
-		newWorldData = world
-
-		for i := 0; i < p.Threads; i++ {
-			part := <-out[i]
-			newWorldData = append(newWorldData, part...)
-		}
-	}
-
-	return world
 
 }
