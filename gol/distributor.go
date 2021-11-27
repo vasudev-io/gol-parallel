@@ -1,7 +1,9 @@
 package gol
 
 import (
+	"fmt"
 	"strconv"
+	"time"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -66,6 +68,7 @@ func distributor(p Params, c distributorChannels) {
 
 	workerHeight = p.ImageHeight / p.Threads
 	left := p.ImageHeight % p.Threads
+	tk := time.NewTicker(2 * time.Second)
 
 	out := make([]chan [][]byte, p.Threads)
 	for k := range out {
@@ -78,6 +81,7 @@ func distributor(p Params, c distributorChannels) {
 	newWorldData := world
 
 	for turn < p.Turns {
+
 		if p.Threads == 1 {
 
 			newWorldData = calculateNextState(p, 0, p.ImageHeight, newWorldData)
@@ -115,18 +119,26 @@ func distributor(p Params, c distributorChannels) {
 
 		}
 
+		fmt.Println(turn)
+
+		select {
+		case <-tk.C:
+			c.events <- TurnComplete{CompletedTurns: turn}
+			c.events <- AliveCellsCount{CompletedTurns: turn, CellsCount: len(calculateAliveCells(p, newWorldData))}
+
+		}
 	}
+	tk.Stop()
 
 	// TODO: Execute all turns of the Game of Life.
 
 	// the following would iterate calculating next state till done with turns
 
 	// send the next turn stuff thru to the response struct
-	p.Turns = turn
 
 	alivers := calculateAliveCells(p, newWorldData)
 
-	final := FinalTurnComplete{CompletedTurns: p.Turns, Alive: alivers}
+	final := FinalTurnComplete{CompletedTurns: turn, Alive: alivers}
 	c.events <- final
 
 	// Make sure that the Io has finished any output before exiting.
@@ -134,6 +146,10 @@ func distributor(p Params, c distributorChannels) {
 	<-c.ioIdle
 
 	c.events <- StateChange{turn, Quitting}
+
+	c.ioCommand <- ioInput
+
+	//c.ioFilename <- FileName
 
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
