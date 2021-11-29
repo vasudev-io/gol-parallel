@@ -1,7 +1,6 @@
 package gol
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -106,6 +105,7 @@ func distributor(p Params, c distributorChannels) {
 			for j := range finalWorldData {
 				finalWorldData[j] = make([]byte, p.ImageWidth)
 			}*/
+
 			finalWorldData := make([][]byte, 0)
 			for i := 0; i < p.Threads; i++ {
 				part := <-out[i]
@@ -119,14 +119,22 @@ func distributor(p Params, c distributorChannels) {
 
 		}
 
-		fmt.Println(turn)
+		//fmt.Println(turn)
+
+		c.events <- TurnComplete{CompletedTurns: turn}
+
+		//go func() {
+		//for {
 
 		select {
 		case <-tk.C:
-			c.events <- TurnComplete{CompletedTurns: turn}
 			c.events <- AliveCellsCount{CompletedTurns: turn, CellsCount: len(calculateAliveCells(p, newWorldData))}
-
+		default:
+			break
 		}
+
+		//}
+		//}()
 	}
 	tk.Stop()
 
@@ -138,18 +146,29 @@ func distributor(p Params, c distributorChannels) {
 
 	alivers := calculateAliveCells(p, newWorldData)
 
-	final := FinalTurnComplete{CompletedTurns: turn, Alive: alivers}
-	c.events <- final
+	c.events <- FinalTurnComplete{CompletedTurns: turn, Alive: alivers}
+
+	c.ioCommand <- ioOutput
+
+	fturn := strconv.Itoa(turn)
+
+	FileName = width + "x" + height + "x" + fturn
+
+	c.ioFilename <- FileName
+
+	for row := 0; row < p.ImageHeight; row++ {
+		for col := 0; col < p.ImageWidth; col++ {
+			c.ioOutput <- newWorldData[row][col]
+		}
+	}
+
+	c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 
 	c.events <- StateChange{turn, Quitting}
-
-	c.ioCommand <- ioInput
-
-	//c.ioFilename <- FileName
 
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
@@ -189,6 +208,8 @@ eight + 1
 		count++
 	}
 
+
+
 	return worldslice1
 }*/
 
@@ -197,6 +218,15 @@ eight + 1
 
 		worldslice1 = world[:len(worldslice1)]
 
+
+		select {
+		case <-ticker.C:
+			c.events <- FinalTurnComplete{CompletedTurns: p.Turns, Alive: calculateAliveCells(p,newWorldData)}
+
+			default:break
+		}
+
+		ticker.Stop()
 	}
 }
 */
