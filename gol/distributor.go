@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -39,6 +40,12 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	for row := 0; row < p.ImageHeight; row++ {
 		for col := 0; col < p.ImageWidth; col++ {
 			world[row][col] = <-c.ioInput //not sure if it works
+			if world[row][col] == 255 {
+				cell := util.Cell{X: row, Y: col}
+
+				c.events <- CellFlipped{CompletedTurns: 0, Cell: cell}
+			}
+
 		}
 	}
 
@@ -119,19 +126,64 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 		}
 
-		/*select {
+		for row := 0; row < p.ImageHeight; row++ {
+			for col := 0; col < p.ImageWidth; col++ {
+
+				if world[row][col] != newWorldData[row][col] {
+
+					cell := util.Cell{X: row, Y: col}
+					c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
+				}
+			}
+		}
+
+		select {
 		// case <-ticker.C:
-		case x := <- keyPresses:
+
+		case x := <-keyPresses:
 			if x == 's' {
 
+				c.ioCommand <- ioOutput
+
+				fturn := strconv.Itoa(turn)
+
+				FileName = width + "x" + height + "x" + fturn
+
+				c.ioFilename <- FileName
+
+				for row := 0; row < p.ImageHeight; row++ {
+					for col := 0; col < p.ImageWidth; col++ {
+						c.ioOutput <- newWorldData[row][col]
+					}
+				}
+
+				c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
 
 			} else if x == 'q' {
-				c.ioOutput
+				c.ioCommand <- ioOutput
+
+				fturn := strconv.Itoa(turn)
+
+				FileName = width + "x" + height + "x" + fturn
+
+				c.ioFilename <- FileName
+
+				for row := 0; row < p.ImageHeight; row++ {
+					for col := 0; col < p.ImageWidth; col++ {
+						c.ioOutput <- newWorldData[row][col]
+					}
+				}
+
+				c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
+
+				c.events <- FinalTurnComplete{CompletedTurns: turn, Alive: calculateAliveCells(p, newWorldData)}
+
 				fmt.Println("Terminated.")
-				return
+
 			} else if x == 'p' {
 				fmt.Println(turn)
 				fmt.Println("Pausing.")
+
 				for {
 					tempKey := <-keyPresses
 					if tempKey == 'p' {
@@ -139,7 +191,8 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 						break
 					}
 				}
-			}}*/
+			}
+		}
 
 		//fmt.Println(turn)
 

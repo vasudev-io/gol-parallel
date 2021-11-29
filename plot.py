@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Read in the saved CSV data.
-benchmark_data = pd.read_csv('results.csv', sep=" ", header=0, names=['name', 'time', 'range'])
+benchmark_data = pd.read_csv('results.csv', header=0, names=['name', 'time', 'range'])
 
 # Go stores benchmark results in nanoseconds. Convert all results to seconds.
 benchmark_data['time'] /= 1e+9
