@@ -16,7 +16,7 @@ type distributorChannels struct {
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels) {
+func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	//string conversion for the filename
 
@@ -119,6 +119,28 @@ func distributor(p Params, c distributorChannels) {
 
 		}
 
+		/*select {
+		// case <-ticker.C:
+		case x := <- keyPresses:
+			if x == 's' {
+
+
+			} else if x == 'q' {
+				c.ioOutput
+				fmt.Println("Terminated.")
+				return
+			} else if x == 'p' {
+				fmt.Println(turn)
+				fmt.Println("Pausing.")
+				for {
+					tempKey := <-keyPresses
+					if tempKey == 'p' {
+						fmt.Println("Continuing.")
+						break
+					}
+				}
+			}}*/
+
 		//fmt.Println(turn)
 
 		c.events <- TurnComplete{CompletedTurns: turn}
@@ -178,6 +200,8 @@ func distributor(p Params, c distributorChannels) {
 //func worldslice(p Params, world[][]byte) [][]byte {
 
 /*var workerHeight int
+
+
 
 workerHeight = p.ImageHeight / p.Threads
 
