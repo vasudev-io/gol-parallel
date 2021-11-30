@@ -91,6 +91,17 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		if p.Threads == 1 {
 
 			newWorldData = calculateNextState(p, 0, p.ImageHeight, newWorldData)
+
+			for row := 0; row < p.ImageHeight; row++ {
+				for col := 0; col < p.ImageWidth; col++ {
+
+					if newWorldData[row][col] != world[row][col] {
+						cell := util.Cell{X: row, Y: col}
+						c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
+					}
+				}
+			}
+			c.events <- TurnComplete{CompletedTurns: turn}
 			turn++
 		} else {
 
@@ -120,22 +131,21 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 			}
 
+			for row := 0; row < p.ImageHeight; row++ {
+				for col := 0; col < p.ImageWidth; col++ {
+
+					if newWorldData[row][col] != finalWorldData[row][col] {
+						cell := util.Cell{X: row, Y: col}
+						c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
+					}
+				}
+			}
+			c.events <- TurnComplete{CompletedTurns: turn}
+
 			newWorldData = finalWorldData
 
 			turn++
 
-		}
-
-		c.events <- TurnComplete{CompletedTurns: turn}
-
-		for row := 0; row < p.ImageHeight; row++ {
-			for col := 0; col < p.ImageWidth; col++ {
-
-				if newWorldData[row][col] != world[row][col] {
-					cell := util.Cell{X: row, Y: col}
-					c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
-				}
-			}
 		}
 
 		//fmt.Println(turn)
@@ -220,7 +230,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	c.ioCommand <- ioOutput
 
-	for row := 0; row < p.ImageHeight; row++ {
+	/*for row := 0; row < p.ImageHeight; row++ {
 		for col := 0; col < p.ImageWidth; col++ {
 			if newWorldData[row][col] == 255 {
 				cell := util.Cell{X: row, Y: col}
@@ -229,7 +239,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			}
 
 		}
-	}
+	}*/
 
 	fturn := strconv.Itoa(turn)
 
