@@ -126,11 +126,12 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 		}
 
+		c.events <- TurnComplete{CompletedTurns: turn}
+
 		for row := 0; row < p.ImageHeight; row++ {
 			for col := 0; col < p.ImageWidth; col++ {
 
-				if world[row][col] != newWorldData[row][col] {
-
+				if newWorldData[row][col] != world[row][col] {
 					cell := util.Cell{X: row, Y: col}
 					c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
 				}
@@ -139,69 +140,66 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 		//fmt.Println(turn)
 
-		c.events <- TurnComplete{CompletedTurns: turn}
-
 		//go func() {
 		//for {
 
 		select {
 		case <-tk.C:
 			c.events <- AliveCellsCount{CompletedTurns: turn, CellsCount: len(calculateAliveCells(p, newWorldData))}
-		/*case x := <-keyPresses:
-		if x == 's' {
+		case x := <-keyPresses:
+			if x == 's' {
 
-			c.ioCommand <- ioOutput
+				c.ioCommand <- ioOutput
 
-			fturn := strconv.Itoa(turn)
+				fturn := strconv.Itoa(turn)
 
-			FileName = width + "x" + height + "x" + fturn
+				FileName = width + "x" + height + "x" + fturn
 
-			c.ioFilename <- FileName
+				c.ioFilename <- FileName
 
-			for row := 0; row < p.ImageHeight; row++ {
-				for col := 0; col < p.ImageWidth; col++ {
-					c.ioOutput <- newWorldData[row][col]
+				for row := 0; row < p.ImageHeight; row++ {
+					for col := 0; col < p.ImageWidth; col++ {
+						c.ioOutput <- newWorldData[row][col]
+					}
+				}
+
+				c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
+
+			} else if x == 'q' {
+				c.ioCommand <- ioOutput
+
+				fturn := strconv.Itoa(turn)
+
+				FileName = width + "x" + height + "x" + fturn
+
+				c.ioFilename <- FileName
+
+				for row := 0; row < p.ImageHeight; row++ {
+					for col := 0; col < p.ImageWidth; col++ {
+						c.ioOutput <- newWorldData[row][col]
+					}
+				}
+
+				c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
+
+				c.events <- FinalTurnComplete{CompletedTurns: turn, Alive: calculateAliveCells(p, newWorldData)}
+
+				fmt.Println("Terminated.")
+
+			} else if x == 'p' {
+				fmt.Println(turn)
+				fmt.Println("Paused!")
+
+				for {
+					tempKey := <-keyPresses
+					if tempKey == 'p' {
+						fmt.Println("Continuing...")
+						break
+					}
 				}
 			}
-
-			c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
-
-		} else if x == 'q' {
-			c.ioCommand <- ioOutput
-
-			fturn := strconv.Itoa(turn)
-
-			FileName = width + "x" + height + "x" + fturn
-
-			c.ioFilename <- FileName
-
-			for row := 0; row < p.ImageHeight; row++ {
-				for col := 0; col < p.ImageWidth; col++ {
-					c.ioOutput <- newWorldData[row][col]
-				}
-			}
-
-			c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
-
-			c.events <- FinalTurnComplete{CompletedTurns: turn, Alive: calculateAliveCells(p, newWorldData)}
-
-			fmt.Println("Terminated.")
-
-		} else if x == 'p' {
-			fmt.Println(turn)
-			fmt.Println("Pausing.")
-
-			for {
-				tempKey := <-keyPresses
-				if tempKey == 'p' {
-					fmt.Println("Continuing.")
-					break
-				}
-			}
-		}*/
 
 		default:
-			break
 
 		}
 
@@ -209,63 +207,6 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		//}()
 	}
 	tk.Stop()
-
-	select {
-	// case <-ticker.C:
-
-	case x := <-keyPresses:
-		if x == 's' {
-
-			c.ioCommand <- ioOutput
-
-			fturn := strconv.Itoa(turn)
-
-			FileName = width + "x" + height + "x" + fturn
-
-			c.ioFilename <- FileName
-
-			for row := 0; row < p.ImageHeight; row++ {
-				for col := 0; col < p.ImageWidth; col++ {
-					c.ioOutput <- newWorldData[row][col]
-				}
-			}
-
-			c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
-
-		} else if x == 'q' {
-			c.ioCommand <- ioOutput
-
-			fturn := strconv.Itoa(turn)
-
-			FileName = width + "x" + height + "x" + fturn
-
-			c.ioFilename <- FileName
-
-			for row := 0; row < p.ImageHeight; row++ {
-				for col := 0; col < p.ImageWidth; col++ {
-					c.ioOutput <- newWorldData[row][col]
-				}
-			}
-
-			c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
-
-			c.events <- FinalTurnComplete{CompletedTurns: turn, Alive: calculateAliveCells(p, newWorldData)}
-
-			fmt.Println("Terminated.")
-
-		} else if x == 'p' {
-			fmt.Println(turn)
-			fmt.Println("Pausing.")
-
-			for {
-				tempKey := <-keyPresses
-				if tempKey == 'p' {
-					fmt.Println("Continuing.")
-					break
-				}
-			}
-		}
-	}
 
 	// TODO: Execute all turns of the Game of Life.
 
@@ -277,19 +218,18 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	c.events <- FinalTurnComplete{CompletedTurns: turn, Alive: alivers}
 
+	c.ioCommand <- ioOutput
+
 	for row := 0; row < p.ImageHeight; row++ {
 		for col := 0; col < p.ImageWidth; col++ {
-			world[row][col] = <-c.ioInput //not sure if it works
-			if world[row][col] == 255 {
+			if newWorldData[row][col] == 255 {
 				cell := util.Cell{X: row, Y: col}
 
-				c.events <- CellFlipped{CompletedTurns: 0, Cell: cell}
+				c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
 			}
 
 		}
 	}
-
-	c.ioCommand <- ioOutput
 
 	fturn := strconv.Itoa(turn)
 
