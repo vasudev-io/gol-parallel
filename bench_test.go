@@ -7,7 +7,7 @@ import (
 	"uk.ac.bris.cs/gameoflife/gol"
 )
 
-const turnBench = 50
+const turnBench = 100
 
 func BenchmarkGol(b *testing.B) {
 

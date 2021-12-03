@@ -20,7 +20,6 @@ type distributorChannels struct {
 func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	//string conversion for the filename
-
 	height := strconv.Itoa(p.ImageHeight)
 	width := strconv.Itoa(p.ImageWidth)
 
@@ -29,8 +28,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	c.ioFilename <- FileName
 
-	// TODO: Create a 2D slice to store the world.
-
+	//2D slice to store the world
 	world := make([][]byte, p.ImageHeight)
 	for i := range world {
 		world[i] = make([]byte, p.ImageWidth)
@@ -42,37 +40,15 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			world[row][col] = <-c.ioInput //not sure if it works
 			if world[row][col] == 255 {
 				cell := util.Cell{X: row, Y: col}
-
 				c.events <- CellFlipped{CompletedTurns: 0, Cell: cell}
 			}
 
 		}
 	}
 
-	// the worker pools to distribute the work to the different worker threads
-
-	/*
-		numthreads:=p.Threads
-
-		jobs := make(chan int, numthreads)
-
-		results := make(chan [][]byte, numthreads)
-
-		for j := 1; j <= numthreads; j++{
-			jobs <- j
-		}
-		close(jobs)
-
-		for a := 1; a <= numthreads; a++{
-			<-results
-		}
-	*/
-
+	//the necessary elements to evolve the Game of Life are initialized
 	turn := 0
-
-	var workerHeight int
-
-	workerHeight = p.ImageHeight / p.Threads
+	workerHeight := p.ImageHeight / p.Threads
 	left := p.ImageHeight % p.Threads
 	tk := time.NewTicker(2 * time.Second)
 
@@ -80,18 +56,15 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	for k := range out {
 		out[k] = make(chan [][]byte)
 	}
-
-	//workerS := make(chan int)
-	//workerE := make(chan int)
-
 	newWorldData := world
 
+	// Execute all turns of the Game of Life.
 	for turn < p.Turns {
 
+		// Serial Implementation
 		if p.Threads == 1 {
 
 			newWorldData = calculateNextState(p, 0, p.ImageHeight, newWorldData)
-
 			for row := 0; row < p.ImageHeight; row++ {
 				for col := 0; col < p.ImageWidth; col++ {
 
@@ -103,27 +76,27 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			}
 			c.events <- TurnComplete{CompletedTurns: turn}
 			turn++
+
 		} else {
 
+			//Parallel Implementation
 			for i := 0; i < p.Threads; i++ {
 				start := i * workerHeight
 				end := (i + 1) * workerHeight
 
+				// Used when there is an odd number of threads and there is a remainder on the modulus func
 				if left > 0 && i == p.Threads-1 {
 					go worker(p, newWorldData, start, p.ImageHeight, out[i])
 
 				} else {
 
+					// Works for all other cases, which means for all even cases
 					go worker(p, newWorldData, start, end, out[i])
 				}
 
 			}
 
-			/*finalWorldData := make([][]byte, p.ImageHeight)
-			for j := range finalWorldData {
-				finalWorldData[j] = make([]byte, p.ImageWidth)
-			}*/
-
+			//Appending of the slices of the world sent from each worker thread
 			finalWorldData := make([][]byte, 0)
 			for i := 0; i < p.Threads; i++ {
 				part := <-out[i]
@@ -131,6 +104,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 			}
 
+			//Updating the CellFlipped event so that the sdl window can be updated
 			for row := 0; row < p.ImageHeight; row++ {
 				for col := 0; col < p.ImageWidth; col++ {
 
@@ -148,23 +122,21 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 		}
 
-		//fmt.Println(turn)
-
-		//go func() {
-		//for {
-
 		select {
+
+		//the ticker which sends the AliveCellsCount to the events channel after every two seconds
 		case <-tk.C:
 			c.events <- AliveCellsCount{CompletedTurns: turn, CellsCount: len(calculateAliveCells(p, newWorldData))}
-		case x := <-keyPresses:
-			if x == 's' {
 
+		//The keypresses which carry out specific tasks
+		case x := <-keyPresses:
+
+			// saving of the current state of the state of the board
+			if x == 's' {
 				c.ioCommand <- ioOutput
 
 				fturn := strconv.Itoa(turn)
-
 				FileName = width + "x" + height + "x" + fturn
-
 				c.ioFilename <- FileName
 
 				for row := 0; row < p.ImageHeight; row++ {
@@ -175,13 +147,12 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 				c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
 
+				//saving the current state of the board and terminating the process
 			} else if x == 'q' {
 				c.ioCommand <- ioOutput
 
 				fturn := strconv.Itoa(turn)
-
 				FileName = width + "x" + height + "x" + fturn
-
 				c.ioFilename <- FileName
 
 				for row := 0; row < p.ImageHeight; row++ {
@@ -196,6 +167,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 				fmt.Println("Terminated.")
 
+				//pausing the processing of the image , continuing on repeated click
 			} else if x == 'p' {
 				fmt.Println(turn)
 				fmt.Println("Paused!")
@@ -208,54 +180,34 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 					}
 				}
 			}
-
 		default:
-
 		}
-
-		//}
-		//}()
 	}
 	tk.Stop()
 
-	// TODO: Execute all turns of the Game of Life.
-
-	// the following would iterate calculating next state till done with turns
-
-	// send the next turn stuff thru to the response struct
-
+	// calculating the number of alivecells at the end of the loop
 	alivers := calculateAliveCells(p, newWorldData)
 
+	// and send that to a channel which goes into the FinalTurnComplete
 	c.events <- FinalTurnComplete{CompletedTurns: turn, Alive: alivers}
 
 	c.ioCommand <- ioOutput
 
-	/*for row := 0; row < p.ImageHeight; row++ {
-		for col := 0; col < p.ImageWidth; col++ {
-			if newWorldData[row][col] == 255 {
-				cell := util.Cell{X: row, Y: col}
-
-				c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
-			}
-
-		}
-	}*/
-
+	//Sending new filename to the channel
 	fturn := strconv.Itoa(turn)
-
 	FileName = width + "x" + height + "x" + fturn
-
 	c.ioFilename <- FileName
 
+	// sending the array of bytes from the world to the ioOutput channel
 	for row := 0; row < p.ImageHeight; row++ {
 		for col := 0; col < p.ImageWidth; col++ {
 			c.ioOutput <- newWorldData[row][col]
 		}
 	}
 
+	// Make sure that the Io has finished any output before exiting.
 	c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: FileName}
 
-	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
 
@@ -266,66 +218,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 }
 
-//func worldslice(p Params, world[][]byte) [][]byte {
-
-/*var workerHeight int
-
-
-
-workerHeight = p.ImageHeight / p.Threads
-
-workerS := make(chan int)
-workerE := make(chan int)
-
-for i:=0;i<p.Threads; i++{
-	start := i*workerHeight - 1
-	end := (i+1)*workerH
-eight + 1
-
-	workerS <- start
-	workerE <- end
-
-	h := end - start
-
-	worldslice1 := make([][]byte, h)
-	for j := range worldslice1 {
-		worldslice1[j] = make([]byte, p.ImageHeight)
-
-	}*/
-
-/*count := 0
-	for i := start; i < end; i++ {
-		for j := 0; j < p.ImageHeight; j++ {
-			worldslice1[count][j] = world[i][j]
-		}
-		count++
-	}
-
-
-
-	return worldslice1
-}*/
-
-/*for j := 0; j <= height; j++ {
-	for i:= 0; i <= p.ImageWidth; i++ {
-
-		worldslice1 = world[:len(worldslice1)]
-
-
-		select {
-		case <-ticker.C:
-			c.events <- FinalTurnComplete{CompletedTurns: p.Turns, Alive: calculateAliveCells(p,newWorldData)}
-
-			default:break
-		}
-
-		ticker.Stop()
-	}
-}
-*/
-
-//}
-
+//worker function which takes the world works on a particular slice as directed in the distributor
 func worker(p Params, world [][]byte, start, end int, out chan<- [][]byte) {
 
 	workerWorldData := calculateNextState(p, start, end, world)
@@ -334,11 +227,7 @@ func worker(p Params, world [][]byte, start, end int, out chan<- [][]byte) {
 
 }
 
-// report how many turns are over and how many alivers are remaining after each turn
-// and send that to a channel which goes into the FinalTurnComplete
-
-// TODO: Report the final state using FinalTurnCompleteEvent.
-
+// Calculates the next evolution of the board
 func calculateNextState(p Params, startY, endY int, world [][]byte) [][]byte {
 
 	//making a separate world to check without disturbing the actual world
@@ -347,6 +236,7 @@ func calculateNextState(p Params, startY, endY int, world [][]byte) [][]byte {
 		testworld[i] = make([]byte, p.ImageWidth)
 	}
 
+	//copying the parts of the world from the original world
 	count := 0
 	for x := startY; x < endY; x++ {
 		for y := 0; y < p.ImageHeight; y++ {
@@ -361,6 +251,7 @@ func calculateNextState(p Params, startY, endY int, world [][]byte) [][]byte {
 
 			alivemeter := 0
 
+			//AliveNeighbourChecker For Loop - checks all 8 neighbours of the current cells to check if they have the pixel value of 255 (alive)
 			for i := row - 1; i <= row+1; i++ {
 				for j := col - 1; j <= col+1; j++ {
 
@@ -391,6 +282,7 @@ func calculateNextState(p Params, startY, endY int, world [][]byte) [][]byte {
 	return testworld
 }
 
+//Calculates whether a cell is alive and then updates this to the alive cells variable
 func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 
 	var alivecells []util.Cell
